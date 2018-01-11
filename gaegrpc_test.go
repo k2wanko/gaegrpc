@@ -83,7 +83,7 @@ func (s *testService) Ping(ctx context.Context, req *testpb.PingRequest) (res *t
 }
 
 func TestPing(t *testing.T) {
-	sv := NewServer(UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	sv := NewServer(grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		id := appengine.AppID(ctx)
 		t.Logf("AppID: %v", id)
 		if want := "testapp"; id != want {
