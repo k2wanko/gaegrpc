@@ -66,8 +66,8 @@ func newContextWithRequest(ctx context.Context, r *http.Request) context.Context
 	return context.WithValue(ctx, requestKey{}, r)
 }
 
-// RequestFromContext returns *http.Request
-func RequestFromContext(ctx context.Context) *http.Request {
+// requestFromContext returns *http.Request
+func requestFromContext(ctx context.Context) *http.Request {
 	if r, ok := ctx.Value(requestKey{}).(*http.Request); ok {
 		return r
 	}
@@ -146,8 +146,8 @@ func NewServer(opt ...ServerOption) *grpc.Server {
 	return grpc.NewServer(ops...)
 }
 
-// NewRequest returns http.Request for GRPC, set the http.Request on memory
-func NewRequest(r *http.Request) *http.Request {
+// newRequest returns http.Request for GRPC, set the http.Request on memory
+func newRequest(r *http.Request) *http.Request {
 	id := requestID(r)
 	mu.Lock()
 	reqs[id] = r
@@ -160,8 +160,8 @@ type wrapResponseWriter struct {
 	w http.ResponseWriter
 }
 
-// NewWrapResponseWriter returns wraped http.ResponseWriter
-func NewWrapResponseWriter(w http.ResponseWriter) http.ResponseWriter {
+// newWrapResponseWriter returns wraped http.ResponseWriter
+func newWrapResponseWriter(w http.ResponseWriter) http.ResponseWriter {
 	return &wrapResponseWriter{
 		w: w,
 	}
@@ -193,8 +193,8 @@ func (w *wrapResponseWriter) Flush() {
 	return
 }
 
-// DeleteRequest deletes the http.Request on memory
-func DeleteRequest(r *http.Request) {
+// deleteRequest deletes the http.Request on memory
+func deleteRequest(r *http.Request) {
 	mu.Lock()
 	delete(reqs, requestID(r))
 	mu.Unlock()
@@ -205,8 +205,9 @@ type wrapHandler struct {
 }
 
 func (s *wrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.h.ServeHTTP(NewWrapResponseWriter(w), NewRequest(r))
-	DeleteRequest(r)
+	r = newRequest(r)
+	defer deleteRequest(r)
+	s.h.ServeHTTP(newWrapResponseWriter(w), r)
 }
 
 // NewWrapHandler returns http.Handler for App Engine
