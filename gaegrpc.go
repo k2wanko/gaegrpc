@@ -21,7 +21,7 @@ type wrapResponseWriter struct {
 	w http.ResponseWriter
 }
 
-// enwWrapResponseWriter returns wraped http.ResponseWriter
+// newWrapResponseWriter returns wraped http.ResponseWriter
 func newWrapResponseWriter(w http.ResponseWriter) http.ResponseWriter {
 	return &wrapResponseWriter{
 		w: w,
