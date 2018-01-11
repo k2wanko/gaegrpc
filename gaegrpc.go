@@ -16,6 +16,47 @@ const HeaderKey = "x-gae-grpc-id"
 
 type requestKey struct{}
 
+type (
+	// ServerOption sets options such as Interceptor.
+	ServerOption func(*options)
+
+	options struct {
+		unaryInt  grpc.UnaryServerInterceptor
+		streamInt grpc.StreamServerInterceptor
+		grpcOpts  []grpc.ServerOption
+	}
+)
+
+// UnaryInterceptor returns a ServerOption
+func UnaryInterceptor(i grpc.UnaryServerInterceptor) ServerOption {
+	return func(o *options) {
+		if o.unaryInt != nil {
+			panic("The unary server interceptor was already set and may not be reset.")
+		}
+		o.unaryInt = i
+		return
+	}
+}
+
+// StreamInterceptor returns a ServerOption
+func StreamInterceptor(i grpc.StreamServerInterceptor) ServerOption {
+	return func(o *options) {
+		if o.streamInt != nil {
+			panic("The stream server interceptor was already set and may not be reset.")
+		}
+		o.streamInt = i
+		return
+	}
+}
+
+// GRPCOptions returns a ServerOption
+func GRPCOptions(opts ...grpc.ServerOption) ServerOption {
+	return func(o *options) {
+		o.grpcOpts = opts
+		return
+	}
+}
+
 var (
 	reqs = make(map[string]*http.Request)
 	mu   sync.RWMutex
@@ -56,22 +97,6 @@ func newAppContext(ctx context.Context) context.Context {
 	return ctx
 }
 
-func injectAppContext() []grpc.ServerOption {
-	return []grpc.ServerOption{
-		grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-			resp, err = handler(newAppContext(ctx), req)
-			return
-		}),
-		grpc.StreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
-			err = handler(srv, &wrapServerStream{
-				ctx:          newAppContext(ss.Context()),
-				ServerStream: ss,
-			})
-			return
-		}),
-	}
-}
-
 type wrapServerStream struct {
 	ctx context.Context
 	grpc.ServerStream
@@ -87,8 +112,38 @@ func requestID(r *http.Request) string {
 }
 
 // NewServer returns grpc.Server for App Engine
-func NewServer(opt ...grpc.ServerOption) *grpc.Server {
-	return grpc.NewServer(append(injectAppContext(), opt...)...)
+func NewServer(opt ...ServerOption) *grpc.Server {
+	o := &options{
+		grpcOpts: []grpc.ServerOption{},
+	}
+	for _, f := range opt {
+		f(o)
+	}
+	ops := append([]grpc.ServerOption{},
+		grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+			ctx = newAppContext(ctx)
+			fmt.Printf("Test: %v", o.unaryInt)
+			if o.unaryInt != nil {
+				resp, err = o.unaryInt(ctx, req, info, handler)
+			} else {
+				resp, err = handler(ctx, req)
+			}
+			return
+		}),
+		grpc.StreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+			wss := &wrapServerStream{
+				ctx:          newAppContext(ss.Context()),
+				ServerStream: ss,
+			}
+			if o.streamInt != nil {
+				err = o.streamInt(srv, wss, info, handler)
+			} else {
+				err = handler(srv, wss)
+			}
+			return
+		}))
+	ops = append(ops, o.grpcOpts...)
+	return grpc.NewServer(ops...)
 }
 
 // NewRequest returns http.Request for GRPC, set the http.Request on memory

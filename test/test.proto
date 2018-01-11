@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package com.github.k2wanko.gaegrpc.test;
+option go_package = "test";
+
+message PingRequest {}
+message Pong {}
+
+service Test {
+    rpc Ping(PingRequest) returns (Pong);
+}
+
