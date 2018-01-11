@@ -12,8 +12,8 @@ func NewServer(opt ...grpc.ServerOption) *grpc.Server {
 	return grpc.NewServer(opt...)
 }
 
-// NewRequest returns http.Request for GRPC, set the http.Request on memory
-func NewRequest(r *http.Request) *http.Request {
+// newRequest returns http.Request for GRPC, set the http.Request on memory
+func newRequest(r *http.Request) *http.Request {
 	return r.WithContext(appengine.WithContext(r.Context(), r))
 }
 
@@ -21,8 +21,8 @@ type wrapResponseWriter struct {
 	w http.ResponseWriter
 }
 
-// NewWrapResponseWriter returns wraped http.ResponseWriter
-func NewWrapResponseWriter(w http.ResponseWriter) http.ResponseWriter {
+// enwWrapResponseWriter returns wraped http.ResponseWriter
+func newWrapResponseWriter(w http.ResponseWriter) http.ResponseWriter {
 	return &wrapResponseWriter{
 		w: w,
 	}
@@ -59,7 +59,7 @@ type wrapHandler struct {
 }
 
 func (s *wrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.h.ServeHTTP(NewWrapResponseWriter(w), NewRequest(r))
+	s.h.ServeHTTP(newWrapResponseWriter(w), newRequest(r))
 }
 
 // NewWrapHandler returns http.Handler for App Engine
